@@ -1,0 +1,49 @@
+#!/usr/bin/python
+
+import sys, getopt, re, requests, posixpath
+
+# Handle command line args
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "ho:", ["help", "output"])
+except getopt.GetoptError as err:
+    print(err)
+    print("4cidl -o <output directory> <thread link>")
+    sys.exit(2)
+out_dir = None
+for o, a in opts:
+    if o in ("-h", "--help"):
+        print("4cidl -o <output directory> <thread link>")
+        sys.exit()
+    elif o in ("-o", "--output"):
+        out_dir = a
+    else:
+        assert False, "unhandled option"
+thread_link = args[0]
+
+p = re.compile(r'^https?:\/\/boards\.(?:4chan|4channel).*\.org\/(\w*)\/thread\/\d*$')
+m = p.match(thread_link)
+if m == None:
+    print("invalid link")
+    sys.exit()
+board = m.group(1)
+
+r = requests.get(thread_link + '.json')
+if r.status_code != 200:
+    print("error in fetching thread information")
+    sys.exit()
+
+for post in r.json()['posts']:
+    if 'tim' in post and 'ext' in post:
+        image_name = str(post['tim']) + post['ext']
+        image_url = 'https://i.4cdn.org/' + board + '/' + image_name
+        r = requests.get(image_url)
+        if r.status_code != 200:
+            print("error fetching " + image_url)
+            continue
+        if out_dir == None:
+            full_path = image_name
+        else:
+            full_path = posixpath.join(out_dir, image_name)
+        file = open(full_path, 'wb')
+        file.write(r.content)
+        file.close()
